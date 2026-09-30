@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Likitha's Function Hall Booking</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f6f2ed;color:#2d211b}
+header{background:#5b1631;color:white;padding:22px;text-align:center}
+nav{display:flex;justify-content:center;gap:10px;padding:12px;background:#fff;box-shadow:0 2px 8px #0001}
+nav button{padding:10px 18px;border:0;border-radius:8px;background:#5b1631;color:white;cursor:pointer}
+.container{max-width:1000px;margin:25px auto;padding:20px}
+.card{background:white;border-radius:14px;padding:22px;box-shadow:0 4px 15px #0001;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+label{font-weight:bold;display:block;margin-bottom:5px}
+input,select{width:100%;padding:11px;border:1px solid #ccc;border-radius:8px}
+.full{grid-column:1/-1}
+.price{font-size:24px;font-weight:bold;color:#5b1631}
+.submit{width:100%;padding:14px;background:#b8860b;color:white;border:0;border-radius:9px;font-size:17px;cursor:pointer}
+.booking{border:1px solid #ddd;border-radius:10px;padding:15px;margin:12px 0}
+.hidden{display:none}.success{background:#e8f7e8;padding:15px;border-radius:8px;color:#176b17}
+</style>
+</head>
+<body>
+<header><h1>Likitha's Function Hall</h1><p>Online Function Hall & Catering Booking</p></header>
+<nav><button onclick="show('book')">Book Hall</button><button onclick="show('list');loadBookings()">View Bookings</button></nav>
+<div class="container">
+<section id="book">
+<div class="card">
+<h2>Book Your Function Hall</h2>
+<form id="bookingForm">
+<div class="grid">
+<div><label>Customer Name</label><input id="name" required></div>
+<div><label>Phone</label><input id="phone" pattern="[0-9]{10}" required></div>
+<div><label>Email</label><input id="email" type="email" required></div>
+<div><label>Event</label><select id="event" required><option value="">Select</option><option>Marriage</option><option>Birthday</option><option>Reception</option><option>Engagement</option><option>Corporate Event</option></select></div>
+<div><label>Booking Date</label><input id="date" type="date" required></div>
+<div><label>Guests</label><input id="guests" type="number" min="1" value="100" required></div>
+<div><label>Function Hall</label><select id="hall" required><option value="" data-price="0">Select Hall</option><option value="Grand Hall" data-price="85000">Grand Hall - ₹85,000</option><option value="Royal Hall" data-price="60000">Royal Hall - ₹60,000</option><option value="Mini Hall" data-price="40000">Mini Hall - ₹40,000</option></select></div>
+<div><label>Food Type</label><select id="foodType" required><option value="" data-price="0">Select Food</option><option value="Veg" data-price="300">Veg - ₹300/person</option><option value="Premium Veg" data-price="400">Premium Veg - ₹400/person</option><option value="Non-Veg" data-price="350">Non-Veg - ₹350/person</option><option value="Premium Non-Veg" data-price="500">Premium Non-Veg - ₹500/person</option></select></div>
+<div><label>Payment Method</label><select id="payment" required><option>UPI</option><option>Card</option><option>Net Banking</option><option>Pay at Hall</option></select></div>
+<div><label>Total Amount</label><div class="price" id="total">₹0</div></div>
+<div class="full"><button class="submit">Confirm Booking</button></div>
+</div>
+</form>
+<div id="message"></div>
+</div>
+</section>
+<section id="list" class="hidden">
+<div class="card"><h2>Booking List</h2><div id="bookingList">Loading...</div></div>
+</section>
+</div>
+<script>
+const API='http://localhost:5000/api';
+const $=id=>document.getElementById(id);
+function show(p){$('book').classList.toggle('hidden',p!=='book');$('list').classList.toggle('hidden',p!=='list')}
+function calc(){
+ const h=$('hall').selectedOptions[0], f=$('foodType').selectedOptions[0];
+ const total=Number(h?.dataset.price||0)+Number(f?.dataset.price||0)*Number($('guests').value||0);
+ $('total').textContent='₹'+total.toLocaleString('en-IN');
+ return total;
+}
+['hall','foodType','guests'].forEach(x=>$(x).addEventListener('input',calc));
+$('bookingForm').addEventListener('submit',async e=>{
+ e.preventDefault(); const total=calc();
+ const data={name:$('name').value,phone:$('phone').value,email:$('email').value,event:$('event').value,date:$('date').value,guests:Number($('guests').value),hall:$('hall').value,foodType:$('foodType').value,payment:$('payment').value,total};
+ try{
+  const r=await fetch(API+'/bookings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const b=await r.json(); if(!r.ok) throw new Error(b.message||'Booking failed');
+  $('message').innerHTML='<div class="success"><b>Booking Confirmed!</b><br>Booking ID: '+b.bookingId+'<br>Payment Status: '+b.paymentStatus+'</div>';
+  $('bookingForm').reset(); $('guests').value=100; calc();
+ }catch(err){$('message').innerHTML='<div class="success" style="color:#9b1c1c;background:#ffecec">'+err.message+'<br>Start the Node.js backend from the project ZIP.</div>'}
+});
+async function loadBookings(){
+ try{
+  const r=await fetch(API+'/bookings'); const list=await r.json();
+  $('bookingList').innerHTML=list.length?list.map(b=>`<div class="booking"><b>${b.bookingId}</b><br>${b.name} | ${b.event} | ${b.date}<br>Hall: ${b.hall} | Guests: ${b.guests}<br>Food: ${b.foodType} | Payment: ${b.payment}<br><b>Total: ₹${Number(b.total).toLocaleString('en-IN')}</b> | ${b.paymentStatus}</div>`).join(''):'No bookings yet.';
+ }catch(e){$('bookingList').innerHTML='Backend is not running. Start Node.js server from the ZIP project.'}
+}
+calc();
+</script>
+</body>
+</html>
